@@ -56,12 +56,15 @@ psdPacketCaptureType packetData;
 #define OUT_FILENAME "out-dump.pcap"
 #define IN_FILENAME  "input.psd"
 #define MICROSECONDS_PER_SEC 1000000
+#define CHAN_MASK  0x7F
+#define RSSI_FLOOR -94
 
 int main(int argc, const char * argv[])
 {
     size_t bytesRead;
     struct pcap_pkthdr pcapHdr;
     struct timeval ts;
+    int rssi, channel;
     
     pcap_dumpfile = pcap_open_dead(DLT_USER0, 128);
     if(pcap_dumpfile == NULL)
@@ -90,7 +93,6 @@ int main(int argc, const char * argv[])
     {
         bytesRead = fread(&packetData, 1, sizeof(psdPacketCaptureType), inFile);
         
-        printf("Packet: %u len: %u\n",packetData.packetNumber, packetData.packetLen - 2);
         
         if(bytesRead)
         {
@@ -106,6 +108,13 @@ int main(int argc, const char * argv[])
             
             pcap_dump((unsigned char *)dumper, &pcapHdr, packetData.packet);
             pcap_dump_flush(dumper);
+            
+            // the two bytes following the ble packet are RSSI and channel
+            channel = packetData.packet[packetData.packetLen-1] & CHAN_MASK;
+            rssi = RSSI_FLOOR + packetData.packet[packetData.packetLen-2];
+            printf("Packet: %u len: %u chan: 0x%02x rssi: %i\n",
+                   packetData.packetNumber, packetData.packetLen, channel, rssi);
+
         }
     }while(bytesRead > 0);
     
